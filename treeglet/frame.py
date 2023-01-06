@@ -1,6 +1,6 @@
 import pyglet
-from gui.widget import WidgetBase
-from gui.graphics import ScissorGroup
+from treeglet.widget import WidgetBase
+from treeglet.graphics import ScissorGroup
 
 class Frame(WidgetBase):
     def __init__(self, window, x, y, width, height, anchor_x="left", anchor_y="bottom", 
@@ -179,12 +179,23 @@ class Frame(WidgetBase):
 
         old_width   = self.width
         old_height  = self.height
+        
+        new_width   = old_width*width/self.wwidth 
+        new_height  = old_height*height/self.wheight 
 
-        self.width   = old_width*width/self.wwidth
-        self.height  = old_height*height/self.wheight
 
-        self.x      = old_x*width/self.wwidth if self.styler.sticky_x else old_x
-        self.y      = old_y*height/self.wheight if self.styler.sticky_y else old_y
+        if self.styler.stretch_resolution == True:
+            """
+            Stretch resolution setup
+            """
+            self.width   = new_width if self.styler.stretch_x else old_width
+            self.height  = new_height if self.styler.stretch_y else old_height
+
+        elif self.styler.fixed_resolution == True:
+            self.width, self.height = self.styler.aspect_ratio_size(self, new_width, new_height)
+
+        self.x      = old_x*width/self.wwidth if self.styler.anchor_x else old_x
+        self.y      = old_y*height/self.wheight if self.styler.anchor_y else old_y
         
         for widget in self.widgets: 
             """
@@ -200,8 +211,8 @@ class Frame(WidgetBase):
                 old_width,
                 old_height
             )            
-            widget.x = self.x+dx*self.width/old_width if widget.styler.sticky_x else widget.x
-            widget.y = self.y+dy*self.height/old_height if widget.styler.sticky_y else widget.y
+            widget.x = self.x+dx*self.width/old_width if widget.styler.anchor_x else widget.x
+            widget.y = self.y+dy*self.height/old_height if widget.styler.anchor_y else widget.y
             
 
         self.wwidth = width

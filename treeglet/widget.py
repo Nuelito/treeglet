@@ -3,34 +3,112 @@ import pyglet
 class WidgetStyle:
     """
     Class made to style widget using different `properties`
-        - Sticky : Modifies widget when parent/window is resized
+        Anchor : Property to allow anchor position
+
+
     """
-    _sticky_x   = True
-    _sticky_y   = True
+    target = None
 
+    #Position modifiers
+    _anchor_x   = True
+    _anchor_y   = True
+
+
+    #Fixed Resolution whatchamacalits
+    _fixed_resolution  = False
+
+    #Stretch Resolution whatchamacalits
+    _stretch_resolution = False
+    stretch_x   = True
+    stretch_y   = True
     
+    """
+    Position modifiers
+    """
 
     @property
-    def sticky_x(self):
-        return self._sticky_x
+    def anchor_x(self):
+        return self._anchor_x
 
-    @sticky_x.setter
-    def sticky_x(self, value):
-        self._sticky_x = value
-
-    @property
-    def sticky_y(self):
-        return self._sticky_y
-
-    @sticky_y.setter
-    def sticky_y(self, value):
-        self._sticky_y = value
+    @anchor_x.setter
+    def anchor_x(self, value):
+        self._anchor_x = value
 
     @property
-    def sticky(self):
-        if sticky_x == sticky_y and sticky_x == True:
+    def anchor_y(self):
+        return self._anchor_y
+
+    @anchor_y.setter
+    def anchor_y(self, value):
+        self._anchor_y = value
+
+    @property
+    def anchor(self):
+        if anchor_x == anchor_y and anchor_x == True:
             return True
         return False
+
+    """
+    Fixed resolution manipulation
+    """
+
+    def get_aspect_ratio(self):
+        from fractions import Fraction
+        eq = Fraction(self.target.width/self.target.height).limit_denominator()
+
+        x = eq.numerator
+        y = eq.denominator
+
+        return x, y
+    def aspect_ratio_size(self, widget, size_x, size_y):
+        """
+        Setting up a fixed resolution
+        """
+
+        aspect_x, aspect_y = self.get_aspect_ratio()
+        width   = widget.width
+        height  = widget.height
+
+        if aspect_x/aspect_y == size_x/size_y: 
+            return size_x, size_y
+
+        if size_x < size_y:
+            width   = size_x
+            height  = size_x*aspect_y/aspect_x
+
+        else:
+            height  = size_y
+            width   = size_y*aspect_x/aspect_y
+
+        
+        return width, height
+    
+
+
+    """
+    Size modifiers
+    """
+
+    @property
+    def stretch_resolution(self):
+        return self._stretch_resolution
+
+    @stretch_resolution.setter
+    def stretch_resolution(self, value):
+        self._stretch_resolution = value
+        self._fixed_resolution = not value
+
+    @property
+    def fixed_resolution(self):
+        return self._fixed_resolution
+
+    @fixed_resolution.setter
+    def fixed_resolution(self, value):
+        self._fixed_resolution = value
+        self._stretch_resolution = not value
+
+
+
 
 class WidgetBase(pyglet.gui.WidgetBase):
     """
@@ -46,6 +124,7 @@ class WidgetBase(pyglet.gui.WidgetBase):
         self.visible    = True
 
         self.styler = WidgetStyle()
+        self.styler.target = self
         self.mouse_handler = None
 
         #Alignement
