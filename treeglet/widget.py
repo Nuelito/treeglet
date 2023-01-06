@@ -60,6 +60,7 @@ class WidgetStyle:
         y = eq.denominator
 
         return x, y
+
     def aspect_ratio_size(self, widget, size_x, size_y):
         """
         Setting up a fixed resolution
@@ -82,8 +83,6 @@ class WidgetStyle:
 
         
         return width, height
-    
-
 
     """
     Size modifiers
@@ -96,7 +95,7 @@ class WidgetStyle:
     @stretch_resolution.setter
     def stretch_resolution(self, value):
         self._stretch_resolution = value
-        self._fixed_resolution = not value
+        self._fixed_resolution = not value if value == True else self._fixed_resolution
 
     @property
     def fixed_resolution(self):
@@ -105,7 +104,7 @@ class WidgetStyle:
     @fixed_resolution.setter
     def fixed_resolution(self, value):
         self._fixed_resolution = value
-        self._stretch_resolution = not value
+        self._stretch_resolution = not value if value == True else self._stretch_resolution
 
 
 
