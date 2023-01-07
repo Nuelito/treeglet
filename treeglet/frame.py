@@ -1,223 +1,318 @@
 import pyglet
-from treeglet.widget import WidgetBase
-from treeglet.graphics import ScissorGroup
+from .widgets import WidgetBase, Behaviour
+from .graphics import ScissorGroup, ScrollingGroup
+
 
 class Frame(WidgetBase):
-    def __init__(self, window, x, y, width, height, anchor_x="left", anchor_y="bottom", 
-                 order=0, group=None, batch=None):
-        WidgetBase.__init__(self, x, y, width, height, anchor_x=anchor_x, anchor_y=anchor_y)
+    def __init__(self, window, x, y, width, height, group=None, batch=None):
+        WidgetBase.__init__(self, x, y, width, height)
         window.push_handlers(self)
+        self._window = window
+        self.behaviour = Behaviour(self, window)
 
-        self.wwidth, self.wheight = window.width, window.height
-        self.window = window
-        self.batch = batch
+        self._children = set()
+        self._root = pyglet.graphics.Group(parent=group)
+        self._group = ScissorGroup(x, y, width, height, order=1, parent=self._root)
+        self._omx, self._omy = 0, 0 #Offset Mouse XY
+        self.batch = batch or pyglet.graphics.Batch()
 
-        #Creating groups
-        xOffset, yOffset = self.get_offset()
-
-        self._group  = group
-        self._rgroup = pyglet.graphics.Group(order=order, parent=group)
-        self._fgroup = ScissorGroup(
-                x - xOffset, 
-                y - yOffset, 
-                width, 
-                height, 
-                order=1, 
-                parent=self._rgroup
-        )
-        self.bgroup = pyglet.graphics.Group(order=0, parent=self._rgroup)
-
-        #Specific Variables
-        self.widgets = set()
-
-        #Temporary
-        self.background = pyglet.shapes.Rectangle(x, y, width, height, group=self.bgroup,
-                                                  batch=batch)
-        self.background.opacity = 50
-
-    """
-    Frame properties
-    """
+        bg_group = pyglet.graphics.Group(order=0, parent=self._root)
+        self.background = pyglet.shapes.Rectangle(x, y, width, height, color=(50,50,50,235), group=bg_group, batch=batch)
 
     @property
     def x(self):
         return self._x
 
-    @x.setter
-    def x(self, value):
-        xOffset, yOffset = self.get_offset() #Alignement offset
-
-        self._x = value
-        self._fgroup.x = value - xOffset
-        self.background.x = self.x - xOffset
-
     @property
     def y(self):
         return self._y
 
+    @x.setter
+    def x(self, value):
+        self._x = value
+        self._group.x = value
+        self.background.x = value
+
     @y.setter
     def y(self, value):
-        xOffset, yOffset = self.get_offset() #Alignement offset
-
         self._y = value
-        self._fgroup.y = value - yOffset
-        self.background.y = self.y - yOffset
+        self._group.y = value
+        self.background.y = value
 
     @property
     def width(self):
         return self._width
 
-    @width.setter
-    def width(self, value):
-        self._width = value
-        self.background.width = value
-
     @property
     def height(self):
         return self._height
 
+    @width.setter
+    def width(self, value):
+        self._width = value
+        self._group.width = value
+        self.background.width = value
+
     @height.setter
     def height(self, value):
         self._height = value
+        self._group.height = value
         self.background.height = value
 
     @property
-    def order(self):
-        return self._order
+    def z_index(self):
+        return self._z_index
 
-    @order.setter
-    def order(self, value):
-        """
-        Changing the core groups and every widgets to display properly in
-        the window.
-        """
+    @z_index.setter
+    def z_index(self, value):
+        self._z_index = value
+        self.set_group(self._group.parent)
 
-        xOffset, yOffset = self.get_offset()
-        self._rgroup = pyglet.graphics.Group(order=value, parent=self._group)
-        self._fgroup = ScissorGroup(
-                self.x - xOffset, 
-                self.y - yOffset, 
-                self.width, 
-                self.height, 
-                order=1, 
-                parent=self._rgroup
-        )
-        visible_bg = self.bgroup.visible
-        self.bgroup = pyglet.graphics.Group(order=0, parent=self._rgroup)
-        self.bgroup.visible = visible_bg
-        self.background.group = self.bgroup
-        self._order = value
-
-        for widget in self.widgets: widget.group = self._fgroup
-
-    """
-    Background properties
-    """
     @property
-    def visible_bg(self):
-        return self.bgroup.visible
+    def visible(self):
+        return self._visible
 
-    @visible_bg.setter
-    def visible_bg(self, value):
-        self.bgroup.visible = value
+    @visible.setter
+    def visible(self, value):
+        self._visible = value
+        self._group.visible = value
+        self.background._group.visible = value
 
-    """
-    Special Functions
-    """
-    def add(self, widget, x=None, y=None):
-        widget.parent = self
-        widget.batch  = self.batch
-        widget.group  = self._fgroup
+    def set_group(self, group):
+        self._root = pyglet.graphics.Group(order=self.z_index, parent=group)
+        self._group = ScissorGroup(self.x, self.y, self.width, self.height, order=1, 
+                                   parent=self._root)
+        bg_group = pyglet.graphics.Group(order=0, parent=self._root)
+        self.background = pyglet.shapes.Rectangle(self.x, self.y, self.width, self.height, 
+                                                  color=(*self.background.color, 
+                                                         self.background.opacity), 
+                                                  group=bg_group, batch=self.batch)
+        for child in self._children: 
+            print(child)
+            child.set_group(self._group)
 
-        #Repositioning widget if needed
-        xOffset, yOffset = self.get_offset()
-        x = widget.x if x == None else self.x - xOffset + x
-        y = widget.y if y == None else self.y - yOffset + y
-        widget.x = x
-        widget.y = y
+    def hide(self):
+        self.visible = False
 
-        self.widgets.add(widget)
-
-    def remove(self, widget):
-        pass
-
-    def update_group(self):
-        xOffset, yOffset    = self.get_offset()
-
-        self._fgroup.x      = self.x - xOffset
-        self._fgroup.y      = self.y - yOffset
-        self._fgroup.width  = self.width
-        self._fgroup.height = self.height
-
-
-    """
-    Events Sections
-    """
+    def show(self):
+        self.visible = True
 
     def on_mouse_press(self, x, y, button, modifiers):
-        for widget in self.widgets:
-            widget.on_mouse_press(x, y, button, modifiers)
+
+        if not self._check_hit(x, y) or not self.visible: return
+        x += self._omx
+        y += self._omy
+
+
+        for widget in self._children:
+            if not widget._check_hit(x, y): continue
+            if not self.mouse:
+                widget.on_mouse_press(x, y, button, modifiers)
+                continue
+            if not self.mouse: break
+
+            if not self.mouse.pwidget:
+                self.mouse.pwidget = widget
+                continue
+            else:
+                if widget == self.mouse.pwidget: continue
+                index1 = self.mouse.pwidget.z_index
+                index2 = widget.z_index
+
+                if index2 > index1:
+                    self.mouse.pwidget = widget
+                    continue
+
+
+        if not self.mouse: return
+        if not self.mouse.pwidget: return
+        if self.mouse.pwidget not in self._children: return
+
+        if not self.mouse.pwidget._check_hit(x,y):
+            y = self.mouse.pwidget.y + self.mouse.pwidget.height+10
+
+        self.mouse.pwidget.on_mouse_press(x, y, button, modifiers)
+
+    def set_group(self, group):
+        self._root = pyglet.graphics.Group(order=self.z_index, parent=group)
+        self._group = ScissorGroup(self.x, self.y, self.width, self.height, order=1, 
+                                   parent=self._root)
+        bg_group = pyglet.graphics.Group(order=0, parent=self._root)
+        self.background = pyglet.shapes.Rectangle(self.x, self.y, self.width, self.height, 
+                                                  color=(*self.background.color, 
+                                                         self.background.opacity), 
+                                                  group=bg_group, batch=self.batch)
+        for child in self._children: child.set_group(self._group)
 
     def on_mouse_release(self, x, y, button, modifiers):
-        for widget in self.widgets:
-            widget.on_mouse_release(x, y, button, modifiers)
+        #if not self._check_hit(x, y): return
+        if self.mouse: self.mouse.pwidget = None
+
+        for widget in self._children:
+            widget.on_mouse_release(x+self._omx, y+self._omy, button, modifiers)
 
     def on_mouse_motion(self, x, y, dx, dy):
-        for widget in self.widgets:
-            widget.on_mouse_motion(x, y, dx, dy)
+        #if not self._check_hit(x, y): return
+        x += self._omx
+        y += self._omy
+
+        for widget in self._children:
+
+            if not self.mouse: 
+                widget.on_mouse_motion(x, y, dx, dy)
+                continue
+            if not self.mouse: return
+   
+            if not self.mouse.hwidget: 
+                self.mouse.hwidget = widget if widget._check_hit(x, y) else self.mouse.hwidget
+                continue
+            else:                
+                if widget == self.mouse.hwidget: continue
+                if not widget._check_hit(x, y): continue
+                index1 = self.mouse.hwidget.z_index
+                index2 = widget.z_index
+
+                if self.mouse.hwidget.parent != widget.parent:
+                    if self.mouse.hwidget.parent: index1 = self.mouse.hwidget.parent.z_index
+                    if widget.parent: index2 = widget.parent.z_index
+
+
+                if index2 > index1:
+                    self.mouse.hwidget.on_mouse_motion(
+                        self.mouse.hwidget.x,
+                        self.mouse.hwidget.y+self.mouse.hwidget.height+10,
+                        dx,
+                        dy
+                    )
+                    self.mouse.hwidget = widget
+                    continue
+
+        if not self.mouse: return
+        if not self.mouse.hwidget: return
+        if self.mouse.hwidget not in self._children: return
+
+        hitting = True
+
+        if not self.mouse.hwidget._check_hit(x, y) or not self._check_hit(x-self._omx,y-self._omy):
+            y = self.mouse.hwidget.y+self.mouse.hwidget.height+10
+            hitting = False
+
+        self.mouse.hwidget.on_mouse_motion(x, y, dx, dy)
+        if hitting == False: self.mouse.hwidget = None
 
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
-        for widget in self.widgets:
-            widget.on_mouse_drag(x, y, dx, dy, button, modifiers)
+        #if not self._check_hit(x, y): return
+        if not self.visible: return        
+        x += self._omx
+        y += self._omy
+
+        for widget in self._children:
+            if not self.mouse:
+                widget.on_mouse_drag(x, y, dx, dy, button, modifiers)
+                continue
+            if not self.mouse: return
+            if not self.mouse.dwidget:
+                self.mouse.dwidget = widget if widget._check_hit(x, y) else self.mouse.dwidget
+                continue
+            else:
+                if self.mouse.dwidget == widget: continue
+                if not widget._check_hit(x, y): continue
+                index1 = self.mouse.dwidget.z_index
+                index2 = widget.z_index
+
+                if self.mouse.dwidget.parent != widget.parent:
+                    index1 = self.mouse.dwidget.parent.z_index
+                    index2 = widget.parent.z_index
+
+                if index2 > index1:
+                    self.mouse.dwidget.on_mouse_drag(
+                        self.mouse.dwidget.x,
+                        self.mouse.dwidget.y+self.mouse.dwidget.height+10,
+                        dx,
+                        dy,
+                        button, modifiers
+                    )
+                    self.mouse.dwidget = widget
+                    continue
+
+        if not self.mouse: return
+        if not self.mouse.dwidget: return
+        if self.mouse.dwidget not in self._children: return
+
+        hitting = True
+
+        if not self.mouse.dwidget._check_hit(x,y) or not self._check_hit(x-self._omx,y-self._omy): 
+            hitting = False
+            y = self.mouse.dwidget.y+self.mouse.dwidget.height+10
+
+
+        self.mouse.dwidget.on_mouse_drag(x, y, dx, dy, button, modifiers)
+        if hitting == False: self.mouse.dwidget = None
 
     def on_resize(self, width, height):
+        if not self.behaviour: return
+        self.behaviour.on_resize(width, height)
         """
-        Updating the frame and the rest of it's descendants
+        dx, dy = width/self.win_width, height/self.win_height
+        self.x *= dx
+        self.y *= dy
+        self.width *=dx
+        self.height*=dy
+        
+        self.win_width, self.win_height = width, height
         """
-        old_x       = self.x
-        old_y       = self.y
+    def add_widget(self, widget):
+        if widget in self._children:
+            return
 
-        old_width   = self.width
-        old_height  = self.height
-        
-        new_width   = old_width*width/self.wwidth 
-        new_height  = old_height*height/self.wheight 
+        widget.z_index = len(self._children)
+        widget.parent = self
+        self._children.add(widget)
+        widget.set_group(self._group)
+        widget.parent = self
 
+    def add_frame(self, frame):
+        """
+        Will be worked on in the future as it is not ready yet for
+        frames under frames
+        """
+        pass
 
-        if self.styler.stretch_resolution == True:
-            """
-            Stretch resolution setup
-            """
-            self.width   = new_width if self.styler.stretch_x else old_width
-            self.height  = new_height if self.styler.stretch_y else old_height
+    def draw(self):
+        if not self.visible: return
+        self.batch.draw()
 
-        elif self.styler.fixed_resolution == True:
-            self.width, self.height = self.styler.aspect_ratio_size(self, new_width, new_height)
+class ScrollFrame(Frame):
+    _scroll_x = 0
+    _scroll_y = 0
 
-        self.x      = old_x*width/self.wwidth if self.styler.anchor_x else old_x
-        self.y      = old_y*height/self.wheight if self.styler.anchor_y else old_y
-        
-        for widget in self.widgets: 
-            """
-            Adjusting widgets with dot product innit?
-            """
+    def __init__(self, window, x, y, width, height, group=None, batch=None):
+        super().__init__(window, x, y, width, height, group, batch)
+        self._group = ScrollingGroup(x, y, width, height, parent=self._root)
+        self._group.window = window
 
-            dx = widget.x - old_x
-            dy = widget.y - old_y
+    def set_group(self, group):
+        self._root = pyglet.graphics.Group(order=self.z_index, parent=group)
+        self._group = ScrollingGroup(self.x, self.y, self.width, self.height, order=1, 
+                                   parent=self._root)
+        self._group.window = self._window
+        bg_group = pyglet.graphics.Group(order=0, parent=self._root)
+        self.background = pyglet.shapes.Rectangle(self.x, self.y, self.width, self.height, 
+                                                  color=(*self.background.color, 
+                                                         self.background.opacity), 
+                                                  group=bg_group, batch=self.batch)
+        for child in self._children: child.set_group(self._group)
 
-            widget.frame_resized(
-                self.width, 
-                self.height,
-                old_width,
-                old_height
-            )            
-            widget.x = self.x+dx*self.width/old_width if widget.styler.anchor_x else widget.x
-            widget.y = self.y+dy*self.height/old_height if widget.styler.anchor_y else widget.y
-            
+    @property
+    def scroll_y(self): return self._scroll_y
 
-        self.wwidth = width
-        self.wheight= height
+    @scroll_y.setter
+    def scroll_y(self, value):
+        self._scroll_y = value
+        self._group.scroll_y = value
+        self._omy = -self.scroll_y
 
-        self.update_group()
-
+    def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
+        if not self._check_hit(x, y): return
+        self.scroll_y -= scroll_y*10
 
