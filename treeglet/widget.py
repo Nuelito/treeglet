@@ -166,6 +166,28 @@ class WidgetBase(pyglet.gui.WidgetBase):
     def anchor_y(self):
         return self._anchor_y
 
+    """
+    Position properties
+    """
+    @property
+    def center(self):
+        x_offset, y_offset = self.get_offset()
+
+        return self.x - x_offset + self.width//2, self.y - y_offset + self.height//2
+
+
+    @property
+    def bottom_left(self):
+        x_offset, y_offset = self.get_offset()
+
+        return self.x - x_offset,  self.y - y_offset
+
+    @property
+    def top_right(self):
+        x_offset, y_offset = self.get_offset()
+        
+        return self.x + x_offset, self.y + y_offset
+
     def get_offset(self):
         x = self.anchor_x
         y = self.anchor_y
@@ -326,19 +348,18 @@ class PushButton(WidgetBase):
     """
     Window events (widget stuff)
     """
-    def frame_resized(self, width, height, owidth, oheight):
+    def frame_resized(self, oldx, oldy, owidth, oheight):
         """
         Function to reposition and resize widgets under frames
         """
-        #dx = owidth - width
-        #dy = oheight - height
+        if not self.styler.fixed_resolution or not self.styler.stretch_resolution: return
+        parent = self.parent
+        new_width  = self.width*parent.width/owidth
+        new_height = self.height*parent.height/oheight
+        
+        self.width = new_width
+        self.height= new_height
 
-        #self.x = self.parent.x+dx*self.parent.width/owidth if self.styler.sticky_x else self.x
-        #self.y = self.parent.y+dy*self.parent.height/oheight if self.styler.sticky_y else self.y
-            
-        return
-        self.width  = self.width*width/owidth
-        self.height = self.height*height/oheight
 
     """
     Window events (mouse interactions)

@@ -198,6 +198,11 @@ class Frame(WidgetBase):
         """
         Updating the frame and the rest of it's descendants
         """
+
+        FB_x, FB_y = self.bottom_left
+        FT_x, FT_y = self.top_right
+        FC_x, FC_y = self.center
+
         old_x       = self.x
         old_y       = self.y
 
@@ -229,17 +234,64 @@ class Frame(WidgetBase):
 
             dx = widget.x - old_x
             dy = widget.y - old_y
+            #dx = (widget.x - old_x) - (widget.x - self.x)
+            #dy = (widget.y - old_y) - (widget.y - self.y)
+            #anchor_x, anchor_y = self.get_offset()
+            #wanchor_x, wanchor_y = widget.get_offset()
+
+            #Fx, Fy  = old_x - anchor_x, old_y - anchor_y
+            #wx, wy = widget.x - wanchor_x, widget.y - wanchor_y
+
+
+            """
+            When resized there is a new x and y coordinations call the frame resized
+            coordinations in order to resize if needed
+            """
+            
+            #Widget Old width and height
+            wo_width  = widget.width
+            wo_height = widget.height
+
+            #The most beautiful code you've ever seen
+
+            positions = [
+                [widget.x - FB_x, widget.y - FB_y],
+                [widget.x - FC_x, widget.y - FC_y],
+                [widget.x - FT_x, widget.y - FT_y],
+            ]
 
             widget.frame_resized(
-                self.width, 
-                self.height,
+                old_x,
+                old_y,
                 old_width,
                 old_height
-            )            
+            )         
+            #widget.x = widget.x+dx if widget.styler.sticky_x else widget.x
+            #widget.y = widget.y+dy if widget.styler.sticky_y else widget.y
+
+            dw = widget.width - wo_width
+            dh = widget.height - wo_height
+
             widget.x = self.x+dx*self.width/old_width if widget.styler.sticky_x else widget.x
             widget.y = self.y+dy*self.height/old_height if widget.styler.sticky_y else widget.y
-            
 
+            nFB_x, nFB_y = self.bottom_left
+            nFC_x, nFC_y = self.center
+            nFT_x, nFT_y = self.top_right #NFT???
+
+
+            #Alignement if not resizing
+            if dw == 0 and widget.styler.sticky_x:
+                if widget.anchor_x == "left":   widget.x = nFB_x + positions[0][0]
+                if widget.anchor_x == "center": widget.x = nFC_x + positions[1][0]
+                if widget.anchor_x == "top":    widget.x = nFT_x + positions[1][0]
+            if dh == 0 and widget.styler.sticky_y:
+                if widget.anchor_y == "bottom": widget.y = nFB_y + positions[0][1]
+                if widget.anchor_y == "center": widget.y = nFC_y + positions[1][1]
+                if widget.anchor_y == "top":    widget.y = nFT_y + positions[2][1]
+
+
+            
         self.wwidth = width
         self.wheight= height
 
@@ -279,6 +331,7 @@ class ScrollFrame(Frame):
         self._fgroup.offset_y = value
 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
+        if not self._check_hit(x, y): return
         self.scroll_y -= scroll_y*10
         self.on_mouse_motion(x, y, 0, 0)
 
@@ -295,9 +348,7 @@ class ScrollFrame(Frame):
             widget.on_mouse_release(x, y, button, modifiers)
 
     def on_mouse_motion(self, x, y, dx, dy):
-        #print("Initial: (%d, %d)"%(x, y))
         y -= self.scroll_y
-        #print("Final  : (%d, %d)\n"%(x, y))
 
         for widget in self.widgets:
             widget.on_mouse_motion(x, y, dx, dy)

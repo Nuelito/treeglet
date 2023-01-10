@@ -1,6 +1,6 @@
 import pyglet
 
-class MouseEvent:
+class MouseHandler:
     def __init__(self):
         """
         A class meant to handle widget interactions. Instances of it's
@@ -35,6 +35,6 @@ class MouseEvent:
         self.x  = x
         self.y  = y
 
-    def on_mouse_drag(self, x, y, button, modifiers):
+    def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
         self.x  = x
         self.y  = y
