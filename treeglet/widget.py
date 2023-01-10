@@ -20,8 +20,8 @@ class WidgetStyle:
 
     #Stretch Resolution whatchamacalits
     _stretch_resolution = False
-    stretch_x   = True
-    stretch_y   = True
+    stretch_x   = False
+    stretch_y   = False
     
     """
     Position modifiers
@@ -101,6 +101,8 @@ class WidgetStyle:
 
     @stretch_resolution.setter
     def stretch_resolution(self, value):
+        self.stretch_x = value
+        self.stretch_y = value
         self._stretch_resolution = value
         self._fixed_resolution = not value if value == True else self._fixed_resolution
 
@@ -352,13 +354,13 @@ class PushButton(WidgetBase):
         """
         Function to reposition and resize widgets under frames
         """
-        if not self.styler.fixed_resolution or not self.styler.stretch_resolution: return
+        #if not self.styler.fixed_resolution or not self.styler.stretch_resolution: return
         parent = self.parent
         new_width  = self.width*parent.width/owidth
         new_height = self.height*parent.height/oheight
         
-        self.width = new_width
-        self.height= new_height
+        self.width = new_width if self.styler.stretch_x else self.width
+        self.height= new_height if self.styler.stretch_y else self.height
 
 
     """
