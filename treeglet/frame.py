@@ -1,90 +1,96 @@
 import pyglet
-from treeglet.widget import WidgetBase
-from treeglet.graphics import ScissorGroup
+from pyglet.graphics import OrderedGroup
+
+from .widget import WidgetBase
+from .graphics import ScissorGroup
 
 class Frame(WidgetBase):
-    def __init__(self, window, x, y, width, height, anchor_x="left", anchor_y="bottom", 
-                 order=0, group=None, batch=None):
-        WidgetBase.__init__(self, x, y, width, height, anchor_x=anchor_x, anchor_y=anchor_y)
-        #window.push_handlers(self)
+    """
+    Class to encapsulate widgets
+    """
 
-        self.wwidth, self.wheight = window.width, window.height
-        self.parent = window
+    def __init__(self, window, x, y, width, height, anchor_x="left", anchor_y="bottom", group=None, batch=None):
+
+        super().__init__(x, y, width, height, anchor_x=anchor_x, anchor_y=anchor_y)
+
         self.window = window
         self.batch = batch
+        self.widgets = set() #Only classes so fine
 
-        #Creating groups
-        xOffset, yOffset = self.get_offset()
+        #Previsous width and height of parent
+        self.pWidth = window.width if not self._parent else self._parent.width
+        self.pHeight= window.height if not self._parent else self._parent.height
 
-        self._group  = group
-        self._rgroup = pyglet.graphics.Group(order=order, parent=group)
-        self._fgroup = ScissorGroup(
-                x - xOffset, 
-                y - yOffset, 
-                width, 
-                height, 
-                order=1,
-                window=window,
-                parent=self._rgroup
+        #Group setup
+        x_offset, y_offset = self.anchor_offset
+
+        self._group = group
+        self.rgroup = OrderedGroup(0, parent=group)
+        self.fgroup = ScissorGroup(
+            x - x_offset,
+            y - y_offset,
+            width,
+            height,
+            order=1, 
+            parent=self.rgroup
         )
-        self.bgroup = pyglet.graphics.Group(order=0, parent=self._rgroup)
+        self.bgroup = OrderedGroup(0, parent=self.rgroup)
 
-        #Specific Variables
-        self.widgets = set()
+        #Background setup
 
-        #Temporary
-        self.background = pyglet.shapes.Rectangle(x, y, width, height, group=self.bgroup,
-                                                  batch=batch)
-        self.background.opacity = 50
+        _background = pyglet.image.SolidColorImagePattern((0,0,0,95))
+        _background = _background.create_image(width, height)
+        self.background = pyglet.sprite.Sprite(
+            _background,
+            x - x_offset,
+            y - y_offset,
+            group=self.bgroup,
+            batch=batch
+        )
+
 
     """
-    Frame properties
+    Properties
     """
-    @property
-    def parent(self):
-        return self._parent
-
-    @parent.setter
-    def parent(self, value):
-        if value == None:
-            self._parent = self.window
-        else:
-            self._parent = value
-        self.wwidth  = value.width
-        self.wheight = value.height
-
     @property
     def x(self):
-        return self._x
+        return self._x #+ self.fgroup.offset_x
 
     @x.setter
     def x(self, value):
-        xOffset, yOffset = self.get_offset() #Alignement offset
+        xO, yO = self.anchor_offset
 
         self._x = value
-        self._fgroup.x = value - xOffset
-        self.background.x = self.x - xOffset
+        #delta_x = value - self.x
+        #self.fgroup.offset_x += delta_x
+
+        self.fgroup.x = value - xO
+        self.background.x = self.x - xO
 
     @property
     def y(self):
-        return self._y
+        return self._y #+ self.fgroup.offset_y
 
     @y.setter
     def y(self, value):
-        xOffset, yOffset = self.get_offset() #Alignement offset
+        xO, yO = self.anchor_offset
 
         self._y = value
-        self._fgroup.y = value - yOffset
-        self.background.y = self.y - yOffset
+        #delta_y = value - self.y
+        #self.fgroup.offset_y += delta_y
 
+        self.fgroup.y = value - yO
+        self.background.y = self.y - yO
+        
     @property
     def width(self):
         return self._width
 
     @width.setter
     def width(self, value):
+        scale_x = value/self._width
         self._width = value
-        self.background.width = value
+        self.background.scale_x *= scale_x
 
     @property
     def height(self):
@@ -92,271 +98,170 @@ class Frame(WidgetBase):
 
     @height.setter
     def height(self, value):
+        scale_y = value/self._height
         self._height = value
-        self.background.height = value
-
-    @property
-    def order(self):
-        return self._order
-
-    @order.setter
-    def order(self, value):
-        """
-        Changing the core groups and every widgets to display properly in
-        the window.
-        """
-
-        xOffset, yOffset = self.get_offset()
-        self._rgroup = pyglet.graphics.Group(order=value, parent=self._group)
-        self._fgroup = ScissorGroup(
-                self.x - xOffset, 
-                self.y - yOffset, 
-                self.width, 
-                self.height, 
-                order=1, 
-                window=window,
-                parent=self._rgroup
-        )
-        visible_bg = self.bgroup.visible
-        self.bgroup = pyglet.graphics.Group(order=0, parent=self._rgroup)
-        self.bgroup.visible = visible_bg
-        self.background.group = self.bgroup
-        self._order = value
-
-        for widget in self.widgets: widget.group = self._fgroup
-
-    @property
-    def group(self):
-        return self._root.parent
-
-    @group.setter
-    def group(self, value):
-        self._group = value
-        self.order = self._order
-
-    """
-    Background properties
-    """
-    @property
-    def visible_bg(self):
-        return self.bgroup.visible
-
-    @visible_bg.setter
-    def visible_bg(self, value):
-        self.bgroup.visible = value
+        self.background.scale_y *= scale_y
 
     """
     Special Functions
     """
     def add_widget(self, widget, x=None, y=None):
         widget.parent = self
-        widget.batch  = self.batch
-        widget.group  = self._fgroup
-
-        #Repositioning widget if needed
-        xOffset, yOffset = self.get_offset()
-        x = widget.x if x == None else self.x - xOffset + x
-        y = widget.y if y == None else self.y - yOffset + y
-        widget.x = x
-        widget.y = y
-
         self.widgets.add(widget)
 
-    def remove(self, widget):
-        pass
+        widget.batch = self.batch
+        widget.group = self.fgroup
 
-    def update_group(self):
-        xOffset, yOffset    = self.get_offset()
+        x_offset, y_offset = self.anchor_offset
 
-        self._fgroup.x      = self.x - xOffset
-        self._fgroup.y      = self.y - yOffset
-        self._fgroup.width  = self.width
-        self._fgroup.height = self.height
+        widget.x = self.x - x_offset+x if x != None else widget.x
+        widget.y = self.y - y_offset+y if y != None else widget.y
 
 
-    """
-    Events Sections
-    """
+    def update_groups(self):
+        x_offset, y_offset = self.anchor_offset
 
-    def on_mouse_press(self, x, y, button, modifiers):
+        self.fgroup.x   = self.x - x_offset
+        self.fgroup.y   = self.y - y_offset
+
+        self.fgroup.width = self.width
+        self.fgroup.height= self.height
+
+    def move(self, x, y):
+        delta_x = x - self.x
+        delta_y = y - self.y
+
         for widget in self.widgets:
-            widget.on_mouse_press(x, y, button, modifiers)
+            widget.x += delta_x
+            widget.y += delta_y
+
+        self.x = x
+        self.y = y
+
+    def drag(self, dx, dy):
+        self.move(self.x + dx, self.y + dy)
+
+    """
+    Window Event (widgets management)
+    """
+    def on_mouse_press(self, x, y, button, modifiers):
+        xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
+        for widget in self.widgets:
+            widget.on_mouse_press(x-xo, y-yo, button, modifiers)
 
     def on_mouse_release(self, x, y, button, modifiers):
+        xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
         for widget in self.widgets:
-            widget.on_mouse_release(x, y, button, modifiers)
+            widget.on_mouse_release(x-xo, y-yo, button, modifiers)
 
     def on_mouse_motion(self, x, y, dx, dy):
+        xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
         for widget in self.widgets:
-            widget.on_mouse_motion(x, y, dx, dy)
+            widget.on_mouse_motion(x-xo, y-yo, dx, dy)
 
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
+        xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
         for widget in self.widgets:
-            widget.on_mouse_drag(x, y, dx, dy, button, modifiers)
+            widget.on_mouse_drag(x-xo, y-yo, dx, dy, button, modifiers)
+
 
     def on_resize(self, width, height):
         """
-        Updating the frame and the rest of it's descendants
+        Resizing and replacing the Frame and its widgets
         """
-
-        FB_x, FB_y = self.bottom_left
-        FT_x, FT_y = self.top_right
-        FC_x, FC_y = self.center
-
-        old_x       = self.x
-        old_y       = self.y
-
-        old_width   = self.width
-        old_height  = self.height
-        
-        new_width   = self.width *(width/self.wwidth)
-        new_height  = self.height*(height/self.wheight)
+        #Old Frame coordinations
+        Fbx, Fby = self.bottom_left
+        Ftx, Fty = self.top_left
+        Fcx, Fcy = self.center
 
 
-        if self.styler.stretch_resolution == True:
-            """
-            Stretch resolution setup
-            """
-            self.width   = new_width if self.styler.stretch_x else old_width
-            self.height  = new_height if self.styler.stretch_y else old_height
+        old_x, old_y = self.x, self.y
+        ooffset_x, ooffset_y = self.fgroup.offset_x, self.fgroup.offset_y
 
-        elif self.styler.fixed_resolution == True:
+        old_width, old_height = self.width, self.height
+        new_width, new_height = self.width*width/self.pWidth, self.height*height/self.pHeight
+
+        if self.styler.stretch_resolution:
+            self.width = new_width if self.styler.stretch_x else old_width
+            self.height= new_height if self.styler.stretch_y else old_height
+
+        elif self.styler.fixed_resolution:
             self.width, self.height = self.styler.aspect_ratio_size(new_width, new_height)
-            #self.width, self.height = self.styler.aspect_ratio_size(self.wwidth, self.wheight)
 
-        self.x      = old_x*width/self.wwidth if self.styler.sticky_x else old_x
-        self.y      = old_y*height/self.wheight if self.styler.sticky_y else old_y
-        
-        for widget in self.widgets: 
-            """
-            Adjusting widgets with dot product innit?
-            """
+        self.x  = old_x*width/self.pWidth if self.styler.sticky_x else old_x
+        self.y  = old_y*height/self.pHeight if self.styler.sticky_y else old_y
 
-            dx = widget.x - old_x
-            dy = widget.y - old_y
-            #dx = (widget.x - old_x) - (widget.x - self.x)
-            #dy = (widget.y - old_y) - (widget.y - self.y)
-            #anchor_x, anchor_y = self.get_offset()
-            #wanchor_x, wanchor_y = widget.get_offset()
+        for widget in self.widgets:
 
-            #Fx, Fy  = old_x - anchor_x, old_y - anchor_y
-            #wx, wy = widget.x - wanchor_x, widget.y - wanchor_y
+            #Saving Previous State
+            dx, dy = widget.x - old_x, widget.y - old_y
+            previous_width, previous_height = widget.width, widget.height
 
-
-            """
-            When resized there is a new x and y coordinations call the frame resized
-            coordinations in order to resize if needed
-            """
-            
-            #Widget Old width and height
-            wo_width  = widget.width
-            wo_height = widget.height
-
-            #The most beautiful code you've ever seen
-
-            positions = [
-                [widget.x - FB_x, widget.y - FB_y],
-                [widget.x - FC_x, widget.y - FC_y],
-                [widget.x - FT_x, widget.y - FT_y],
+            dpositions = [
+                [widget.x - Fbx, widget.y - Fby],
+                [widget.x - Ftx, widget.y - Fty],
+                [widget.x - Fcx, widget.y - Fcy],
             ]
 
-            widget.frame_resized(
-                old_x,
-                old_y,
+            #Changing Position
+            widget._rel_resize(
                 old_width,
-                old_height
-            )         
-            #widget.x = widget.x+dx if widget.styler.sticky_x else widget.x
-            #widget.y = widget.y+dy if widget.styler.sticky_y else widget.y
+                old_height,
+            )
 
-            dw = widget.width - wo_width
-            dh = widget.height - wo_height
+            delta_width = widget.width - previous_width
+            delta_height= widget.height - previous_height
 
             widget.x = self.x+dx*self.width/old_width if widget.styler.sticky_x else widget.x
             widget.y = self.y+dy*self.height/old_height if widget.styler.sticky_y else widget.y
 
-            nFB_x, nFB_y = self.bottom_left
-            nFC_x, nFC_y = self.center
-            nFT_x, nFT_y = self.top_right #NFT???
+            #Alignement if no resizing
+            nFbx, nFby = self.bottom_left
+            nFtx, nFty = self.top_left #NFT ???
+            nFcx, nFcy = self.center
+
+            if delta_width == 0 and widget.styler.sticky_x:
+                if widget.anchor_x == 'left': widget.x = nFbx + dpositions[0][0]
+                if widget.anchor_x == 'right': widget.x = nFtx+dpositions[1][0]
+                if widget.anchor_x == 'center': widget.x = nFcx+dpositions[2][0] 
+
+            if delta_height == 0 and widget.styler.sticky_y:
+                if widget.anchor_y == 'bottom': widget.y = nFby + dpositions[0][1]
+                if widget.anchor_y == 'top': widget.y = nFty+dpositions[1][1]
+                if widget.anchor_y == 'center': widget.y = nFcy+dpositions[2][1]
 
 
-            #Alignement if not resizing
-            if dw == 0 and widget.styler.sticky_x:
-                if widget.anchor_x == "left":   widget.x = nFB_x + positions[0][0]
-                if widget.anchor_x == "center": widget.x = nFC_x + positions[1][0]
-                if widget.anchor_x == "top":    widget.x = nFT_x + positions[1][0]
-            if dh == 0 and widget.styler.sticky_y:
-                if widget.anchor_y == "bottom": widget.y = nFB_y + positions[0][1]
-                if widget.anchor_y == "center": widget.y = nFC_y + positions[1][1]
-                if widget.anchor_y == "top":    widget.y = nFT_y + positions[2][1]
+        self.pWidth = width
+        self.pHeight= height
 
+        self.update_groups()
 
-            
-        self.wwidth = width
-        self.wheight= height
-
-        self.update_group()
-    
-    def frame_resized(self, width, height, owidth, oheight):
-        """
-        Might be updated in the future for frames under frame
-        features
-        """
-        return
 
 class ScrollFrame(Frame):
     """
-    Self explainatory
+    Extension class for `Frame` class to allow scrolling
     """
-
-    def __init__(self, window, x, y, width, height, anchor_x="left", anchor_y="bottom", 
-                 order=0, group=None, batch=None):
-        Frame.__init__(self, window, x, y, width, height, anchor_x=anchor_x, anchor_y=anchor_y,
-                       order=order, group=group, batch=batch)
+    _scroll_x = 0
+    _scroll_y = 0
 
     @property
     def scroll_x(self):
-        return self._fgroup.offset_x
+        return self._scroll_x
 
     @scroll_x.setter
-    def scroll_x(sellf, value):
-        self._fgroup.offset_x = value
+    def scroll_x(self, value):
+        self.fgroup.offset_x = value
+        self._scroll_x = value
 
     @property
     def scroll_y(self):
-        return self._fgroup.offset_y
+        return self._scroll_y
 
     @scroll_y.setter
     def scroll_y(self, value):
-        self._fgroup.offset_y = value
+        self.fgroup.offset_y = value
+        self._scroll_y = value
 
-    def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
-        if not self._check_hit(x, y): return
-        self.scroll_y -= scroll_y*10
-        self.on_mouse_motion(x, y, 0, 0)
-
-    def on_mouse_press(self, x, y, button, modifiers):
-        y -= self.scroll_y
-
-        for widget in self.widgets:
-            widget.on_mouse_press(x, y, button, modifiers)
-
-    def on_mouse_release(self, x, y, button, modifiers):
-        y -= self.scroll_y
-
-        for widget in self.widgets:
-            widget.on_mouse_release(x, y, button, modifiers)
-
-    def on_mouse_motion(self, x, y, dx, dy):
-        y -= self.scroll_y
-
-        for widget in self.widgets:
-            widget.on_mouse_motion(x, y, dx, dy)
-
-    def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
-        y -= self.scroll_y
-
-        for widget in self.widgets:
-            widget.on_mouse_drag(x, y, dx, dy, button, modifiers)
-
-
+    def on_mouse_scroll(self, x, y , dx, dy):
+        self.scroll_x += dx
+        self.scroll_y += dy*5
