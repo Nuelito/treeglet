@@ -38,7 +38,7 @@ class Frame(WidgetBase):
 
         #Background setup
 
-        _background = pyglet.image.SolidColorImagePattern((95,95,95,255))
+        _background = pyglet.image.SolidColorImagePattern((0,0,0,125))
         _background = _background.create_image(width, height)
         self.background = pyglet.sprite.Sprite(
             _background,
@@ -129,13 +129,13 @@ class Frame(WidgetBase):
     """
     Special Functions
     """
-    def add_widget(self, widget, x=None, y=None, order=None):
+    def add_widget(self, widget, x=None, y=None, z=None):
         widget.parent = self
         self.widgets.add(widget)
 
         widget.batch = self.batch
         widget.group = self.fgroup
-        widget.order = len(self.widgets)
+        widget.z = len(self.widgets) if z == None else z
 
         x_offset, y_offset = self.anchor_offset
 
@@ -176,13 +176,36 @@ class Frame(WidgetBase):
     """
     def on_mouse_press(self, x, y, button, modifiers):
         xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
-        for widget in self.widgets:
-            widget.on_mouse_press(x-xo, y-yo, button, modifiers)
+        if self.mouse_handler == None:
+            for widget in self.widgets:
+                widget.on_mouse_press(x-xo, y-yo, button, modifiers)
+        else:
+            if not self._check_hit(x, y):
+                if self.mouse_handler.frame == self:
+                    self.mouse_handler._remove_frame()
+                return
+            else: self.mouse_handler.frame = self
+
+            for widget in self.widgets:
+                if widget._check_hit(x-xo, y-yo):
+                    self.mouse_handler.pwidget = widget
+
+            if self.mouse_handler.pwidget in self.widgets:
+                self.mouse_handler.pwidget.on_mouse_press(x-xo, y-yo, button, modifiers)
+
 
     def on_mouse_release(self, x, y, button, modifiers):
         xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
-        for widget in self.widgets:
-            widget.on_mouse_release(x-xo, y-yo, button, modifiers)
+        if self.mouse_handler == None:
+            for widget in self.widgets: 
+                widget.on_mouse_release(x-xo, y-yo, button, modifiers)
+        else:
+            if self.mouse_handler.pwidget in self.widgets:
+                if not self._check_hit(x, y):
+                    x, y = self.mouse_handler.pwidget.bottom_left
+                    x = x-1
+                self.mouse_handler.pwidget.on_mouse_release(x, y, button, modifiers)
+                self.mouse_handler._pwidget = None
 
     def on_mouse_motion(self, x, y, dx, dy):
         xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
@@ -196,9 +219,11 @@ class Frame(WidgetBase):
                     self.mouse_handler._remove_frame()
                 return
             else: self.mouse_handler.frame = self
+            
+            if self.mouse_handler.frame != self: return
 
             for widget in self.widgets:
-                if widget._check_hit(x-xo, y-yo):
+                if widget._check_hit(x-xo, y-yo) and widget != self.mouse_handler.hwidget:
                     self.mouse_handler._remove_hover()
                     self.mouse_handler.hwidget = widget
 
@@ -208,8 +233,31 @@ class Frame(WidgetBase):
 
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
         xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
-        for widget in self.widgets:
-            widget.on_mouse_drag(x-xo, y-yo, dx, dy, button, modifiers)
+
+        if self.mouse_handler == None:
+            for widget in self.widgets:
+                widget.on_mouse_drag(x-xo, y-yo, dx, dy, button, modifiers)
+        else:
+            if not self._check_hit(x, y):
+                if self.mouse_handler.frame == self:
+                    self.mouse_handler._remove_frame()
+                return
+            else: self.mouse_handler.frame = self
+            
+            if self.mouse_handler.frame != self: return
+
+            for widget in self.widgets:
+                if widget._check_hit(x-xo, y-yo) and widget != self.mouse_handler.dwidget:
+                    self.mouse_handler._remove_drag()
+                    self.mouse_handler.dwidget = widget
+
+            if self.mouse_handler.dwidget in self.widgets:
+                self.mouse_handler.dwidget.on_mouse_drag(x-xo, y-yo, dx, dy, button, modifiers)
+
+
+
+
+           
 
 
     def on_resize(self, width, height):
@@ -295,6 +343,13 @@ class ScrollFrame(Frame):
 
         self.scroll_x_multiplier = 0
         self.scroll_y_multiplier = 5
+
+        #Scroll limits will be used later
+        self.min_scroll_x = None
+        self.max_scroll_x = None
+
+        self.min_scroll_y = None
+        self.max_scroll_y = None
 
     @property
     def scroll_x(self):

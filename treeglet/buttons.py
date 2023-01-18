@@ -100,7 +100,6 @@ class PushButton(WidgetBase):
         self._group = OrderedGroup(self.z, parent=value)
         bgroup = OrderedGroup(0, parent=self._group)
         self._sprite.group = bgroup
-        print(self.x)
 
     @property
     def batch(self):
@@ -151,6 +150,7 @@ class PushButton(WidgetBase):
         if not self.enabled or not self.visible or not self.pressed:
             return
         self.pressed = False
+        if self._check_hit(x, y): self.dispatch_event("on_click")
         self._sprite.image = self._himage if self._check_hit(x, y) else self._dimage
 
     def on_mouse_motion(self, x, y, dx, dy):
@@ -162,6 +162,8 @@ class PushButton(WidgetBase):
         if not self.enabled or self.pressed:
             return
         self._sprite.image = self._himage if self._check_hit(x, y) else self._dimage
+
+PushButton.register_event_type("on_click")
 
 
 class TextButton(PushButton):
