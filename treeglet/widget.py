@@ -7,7 +7,6 @@ class WidgetStyler:
     """
 
     target = None
-    mouse_handler = None
 
     #Position arguments
     sticky_x    = True
@@ -97,6 +96,7 @@ class WidgetBase(pyglet.gui.WidgetBase):
     def __init__(self, x, y, width, height, anchor_x="left", anchor_y="bottom"):
         super().__init__(x, y, width, height)
 
+        self.mouse_handler = None
         self._parent    = None
         self._visible   = True
         self._z     = 0 #Z index of widget
