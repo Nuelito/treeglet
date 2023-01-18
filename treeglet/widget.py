@@ -178,7 +178,7 @@ class PushButton(WidgetBase):
             batch=self._batch
         )
 
-        self.pressed = False
+        self._pressed = False
 
     """
     Properties
@@ -241,6 +241,14 @@ class PushButton(WidgetBase):
     @visible.setter
     def visible(self, value):
         self._visible = value
+
+    @property
+    def pressed(self):
+        return self._pressed
+
+    @pressed.setter
+    def pressed(self, value):
+        self._pressed = value
 
 
     @property
@@ -322,13 +330,22 @@ class ToggleButton(PushButton):
     Extension class from pyglet.gui.ToggleButton
     """
 
+    @property
+    def pressed(self):
+        return self._pressed
+
+    @pressed.setter
+    def pressed(self, value):
+        self._pressed = value
+        self._sprite.image = self._dimage
+
     def _get_release_image(self, x, y):
         return self._himage if self._check_hit(x, y) else self._dimage
 
     def on_mouse_press(self, x, y, button, modifiers):
         if not self.enabled or not self._check_hit(x, y):
             return
-        self.pressed = not self.pressed
+        self._pressed = not self._pressed
         self._sprite.image = self._pimage if self.pressed else self._get_release_image(x, y)
         self.dispatch_event("on_toggle", self.pressed)
 
