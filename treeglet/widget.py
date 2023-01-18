@@ -7,6 +7,7 @@ class WidgetStyler:
     """
 
     target = None
+    mouse_handler = None
 
     #Position arguments
     sticky_x    = True
@@ -99,6 +100,7 @@ class WidgetBase(pyglet.gui.WidgetBase):
         self._parent    = None
         self._visible   = True
         self._z     = 0 #Z index of widget
+        self._id    = "widget"
 
         self.styler = WidgetStyler()
         self.styler.target = self
@@ -106,11 +108,6 @@ class WidgetBase(pyglet.gui.WidgetBase):
         #Alignement
         self.anchor_x = anchor_x
         self.anchor_y = anchor_y
-
-        #Offset
-        self._offset_x = 0
-        self._offset_y = 0
-
 
     @property
     def bottom_left(self):
@@ -144,4 +141,15 @@ class WidgetBase(pyglet.gui.WidgetBase):
         for var, value in kwargs.items():
             setattr(self.styler, var, value)
 
+    @property
+    def absolute_z(self):
+        if self.parent: return self.parent.z
+        else: return self.z
 
+    """
+    Slight change
+    """
+
+    def _check_hit(self, x, y):
+        bx, by = self.bottom_left
+        return bx < x < bx + self._width and by < y < by + self._height

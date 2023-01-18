@@ -100,6 +100,7 @@ class PushButton(WidgetBase):
         self._group = OrderedGroup(self.z, parent=value)
         bgroup = OrderedGroup(0, parent=self._group)
         self._sprite.group = bgroup
+        print(self.x)
 
     @property
     def batch(self):

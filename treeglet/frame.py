@@ -25,7 +25,7 @@ class Frame(WidgetBase):
         x_offset, y_offset = self.anchor_offset
 
         self._group = group
-        self.rgroup = OrderedGroup(0, parent=group)
+        self.rgroup = OrderedGroup(self._z, parent=group)
         self.fgroup = ScissorGroup(
             x - x_offset,
             y - y_offset,
@@ -38,7 +38,7 @@ class Frame(WidgetBase):
 
         #Background setup
 
-        _background = pyglet.image.SolidColorImagePattern((0,0,0,95))
+        _background = pyglet.image.SolidColorImagePattern((95,95,95,255))
         _background = _background.create_image(width, height)
         self.background = pyglet.sprite.Sprite(
             _background,
@@ -54,33 +54,50 @@ class Frame(WidgetBase):
     """
     @property
     def x(self):
-        return self._x #+ self.fgroup.offset_x
+        return self._x 
 
     @x.setter
     def x(self, value):
         xO, yO = self.anchor_offset
 
         self._x = value
-        #delta_x = value - self.x
-        #self.fgroup.offset_x += delta_x
 
         self.fgroup.x = value - xO
-        self.background.x = self.x - xO
+        self.background.x = int(self.x - xO)
 
     @property
     def y(self):
-        return self._y #+ self.fgroup.offset_y
+        return self._y 
 
     @y.setter
     def y(self, value):
         xO, yO = self.anchor_offset
 
         self._y = value
-        #delta_y = value - self.y
-        #self.fgroup.offset_y += delta_y
 
         self.fgroup.y = value - yO
-        self.background.y = self.y - yO
+        self.background.y = int(self.y - yO)
+
+    @property
+    def z(self):
+        return self._z
+
+    @z.setter
+    def z(self, value):
+        self.rgroup = OrderedGroup(value, parent=self._group)
+        self.bgroup = OrderedGroup(0, parent=self.rgroup)
+        x, y = self.bottom_left
+
+        fgroup = ScissorGroup(x, y, self.width, self.height, 1, parent=self.rgroup)
+        fgroup.offset_x = self.fgroup.offset_x
+        fgroup.offset_y = self.fgroup.offset_y
+
+        self.fgroup = fgroup
+        self.background.group = self.bgroup
+        self._z = value
+
+        for widget in self.widgets: widget.group = self.fgroup
+
         
     @property
     def width(self):
@@ -102,21 +119,34 @@ class Frame(WidgetBase):
         self._height = value
         self.background.scale_y *= scale_y
 
+    @property
+    def offset_x(self):
+        return self.fgroup.offset_x
+
+    @property
+    def offset_y(self):
+        return self.fgroup.offset_y
     """
     Special Functions
     """
-    def add_widget(self, widget, x=None, y=None):
+    def add_widget(self, widget, x=None, y=None, order=None):
         widget.parent = self
         self.widgets.add(widget)
 
         widget.batch = self.batch
         widget.group = self.fgroup
+        widget.order = len(self.widgets)
 
         x_offset, y_offset = self.anchor_offset
 
         widget.x = self.x - x_offset+x if x != None else widget.x
         widget.y = self.y - y_offset+y if y != None else widget.y
 
+    def remove_widget(self, widget):
+        self.widgets.remove(widget)
+        widget.parent = None
+        widget.batch = None
+        widget.group = None
 
     def update_groups(self):
         x_offset, y_offset = self.anchor_offset
@@ -156,8 +186,25 @@ class Frame(WidgetBase):
 
     def on_mouse_motion(self, x, y, dx, dy):
         xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
-        for widget in self.widgets:
-            widget.on_mouse_motion(x-xo, y-yo, dx, dy)
+        if self.mouse_handler == None:
+            for widget in self.widgets:
+                widget.on_mouse_motion(x-xo, y-yo, dx, dy)
+        else:
+            
+            if not self._check_hit(x, y):
+                if self.mouse_handler.frame == self:
+                    self.mouse_handler._remove_frame()
+                return
+            else: self.mouse_handler.frame = self
+
+            for widget in self.widgets:
+                if widget._check_hit(x-xo, y-yo):
+                    self.mouse_handler._remove_hover()
+                    self.mouse_handler.hwidget = widget
+
+            if self.mouse_handler.hwidget in self.widgets:
+                self.mouse_handler.hwidget.on_mouse_motion(x-xo, y-yo, dx, dy)
+
 
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
         xo, yo = self.fgroup.offset_x, self.fgroup.offset_y
@@ -241,8 +288,13 @@ class ScrollFrame(Frame):
     """
     Extension class for `Frame` class to allow scrolling
     """
-    _scroll_x = 0
-    _scroll_y = 0
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._scroll_x = 0
+        self._scroll_y = 0
+
+        self.scroll_x_multiplier = 0
+        self.scroll_y_multiplier = 5
 
     @property
     def scroll_x(self):
@@ -263,5 +315,9 @@ class ScrollFrame(Frame):
         self._scroll_y = value
 
     def on_mouse_scroll(self, x, y , dx, dy):
-        self.scroll_x += dx
-        self.scroll_y += dy*5
+        if self.mouse_handler:
+            self.mouse_handler.frame = self
+            if self.mouse_handler.frame != self: return
+        if not self._check_hit(x, y): return
+        if self.scroll_x_multiplier != 0: self.scroll_x += dx*self.scroll_x_multiplier
+        if self.scroll_y_multiplier != 0: self.scroll_y += dy*self.scroll_y_multiplier
