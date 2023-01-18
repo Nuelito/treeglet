@@ -85,9 +85,14 @@ class Frame(WidgetBase):
     @z.setter
     def z(self, value):
         self.rgroup = OrderedGroup(value, parent=self._group)
-        self.bgroup = OrderedGroup(0, parent=self.rgroup)
         x, y = self.bottom_left
 
+        #Background Group Reset
+        bgroup = OrderedGroup(0, parent=self.rgroup)
+        bgroup.visible = self.bgroup.visible
+        self.bgroup = bgroup
+
+        #Foreground Group Reset
         fgroup = ScissorGroup(x, y, self.width, self.height, 1, parent=self.rgroup)
         fgroup.offset_x = self.fgroup.offset_x
         fgroup.offset_y = self.fgroup.offset_y
@@ -126,6 +131,15 @@ class Frame(WidgetBase):
     @property
     def offset_y(self):
         return self.fgroup.offset_y
+
+    @property
+    def background_visible(self):
+        return self.background.visible
+
+    @background_visible.setter
+    def background_visible(self, value):
+        self.background.visible = value
+
     """
     Special Functions
     """
@@ -357,7 +371,7 @@ class ScrollFrame(Frame):
 
     @scroll_x.setter
     def scroll_x(self, value):
-        self.fgroup.offset_x = value
+        self.fgroup.offset_x = int(value)
         self._scroll_x = value
 
     @property
@@ -366,7 +380,7 @@ class ScrollFrame(Frame):
 
     @scroll_y.setter
     def scroll_y(self, value):
-        self.fgroup.offset_y = value
+        self.fgroup.offset_y = int(value)
         self._scroll_y = value
 
     def on_mouse_scroll(self, x, y , dx, dy):

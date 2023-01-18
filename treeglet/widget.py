@@ -153,3 +153,188 @@ class WidgetBase(pyglet.gui.WidgetBase):
     def _check_hit(self, x, y):
         bx, by = self.bottom_left
         return bx < x < bx + self._width and by < y < by + self._height
+        
+
+class PushButton(WidgetBase):
+
+    def __init__(self, x, y, depressed, pressed, hover, anchor_x="left", anchor_y="bottom", group=None, batch=None):
+
+        super().__init__(x, y, depressed.width, depressed.height, anchor_x=anchor_x, anchor_y=anchor_y)
+
+        self._batch = batch or Batch()
+        self._group = OrderedGroup(0, parent=group)
+        bgroup      = OrderedGroup(0, parent=self._group)
+
+        #Images
+        self._himage = hover
+        self._pimage = pressed
+        self._dimage = depressed
+
+        self._sprite = pyglet.sprite.Sprite(
+            depressed,
+            x,
+            y,
+            group=bgroup,
+            batch=self._batch
+        )
+
+        self.pressed = False
+
+    """
+    Properties
+    """
+
+    @property
+    def x(self):
+        return self._x
+
+    @x.setter
+    def x(self, value):
+        xO, yO  = self.anchor_offset
+        self._sprite.x = value - xO
+        self._x = value
+
+
+    @property
+    def y(self):
+        return self._y
+
+    @y.setter
+    def y(self, value):
+        xO, yO = self.anchor_offset
+        self._sprite.y = value - yO
+        self._y = value
+
+    @property
+    def z(self):
+        return self._z
+
+    @z.setter
+    def z(self, value):
+        self._group = OrderedGroup(value, parent=self._group.parent)
+        bgroup = OrderedGroup(0, parent=self._group)
+        self._sprite.group = bgroup
+        self._z = value
+
+    @property
+    def width(self):
+        return self._width
+
+    @width.setter
+    def width(self, value):
+        self._sprite.scale_x *= value/self._width
+        self._width = value
+        
+    @property
+    def height(self):
+        return self._height
+
+    @height.setter
+    def height(self, value):
+        self._sprite.scale_y *= value/self._height
+        self._height = value
+
+    @property
+    def visible(self):
+        return self._visible
+
+    @visible.setter
+    def visible(self, value):
+        self._visible = value
+
+
+    @property
+    def group(self):
+        return self._group.parent
+
+    @group.setter
+    def group(self, value):
+        self._group = OrderedGroup(self.z, parent=value)
+        bgroup = OrderedGroup(0, parent=self._group)
+        self._sprite.group = bgroup
+
+    @property
+    def batch(self):
+        return self._batch
+
+    @batch.setter
+    def batch(self, value):
+        self._batch = value
+        self._sprite.batch = value
+
+    def _check_hit(self, x, y):
+        xO, yO = self.anchor_offset
+        return self._x < x+xO < self._x + self._width and self._y < y+yO < self._y + self._height
+
+    """
+    Custom function
+    """
+    def _rel_resize(self, pp_width, pp_height):
+        """
+        Relative resize
+        Function to resize widget based on parent's changes.
+
+        Properties
+        `pp_width`  : Parent Previous Width
+        `pp_height` : Parent Previous Height
+        """
+        new_width  = self.width*self.parent.width/pp_width
+        new_height = self.height*self.parent.height/pp_height
+
+        if self.styler.stretch_resolution == True:
+            self.width  = new_width if self.styler.stretch_x else self.width
+            self.height = new_height if self.styler.stretch_y else self.height
+        elif self.styler.fixed_resolution == True:
+            self.width, self.height = self.styler.aspect_ratio_size(new_width, new_height)
+        
+    
+    """
+    Window Events
+    """
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        if not self.enabled or not self.visible or not self._check_hit(x,y):
+            return
+        self.pressed = True
+        self._sprite.image = self._pimage
+
+    def on_mouse_release(self, x, y, button, modifiers):
+        if not self.enabled or not self.visible or not self.pressed:
+            return
+        self.pressed = False
+        if self._check_hit(x, y): self.dispatch_event("on_click")
+        self._sprite.image = self._himage if self._check_hit(x, y) else self._dimage
+
+    def on_mouse_motion(self, x, y, dx, dy):
+        if not self.enabled or self.pressed:
+            return
+        self._sprite.image = self._himage if self._check_hit(x, y) else self._dimage
+
+    def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
+        if not self.enabled or self.pressed:
+            return
+        self._sprite.image = self._himage if self._check_hit(x, y) else self._dimage
+
+PushButton.register_event_type("on_click")
+
+class ToggleButton(PushButton):
+    """
+    Extension class from pyglet.gui.ToggleButton
+    """
+
+    def _get_release_image(self, x, y):
+        return self._himage if self._check_hit(x, y) else self._dimage
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        if not self.enabled or not self._check_hit(x, y):
+            return
+        self.pressed = not self.pressed
+        self._sprite.image = self._pimage if self.pressed else self._get_release_image(x, y)
+        self.dispatch_event("on_toggle", self.pressed)
+
+    def on_mouse_release(self, x, y, button, modifiers):
+        if not self.enabled or self.pressed:
+            return
+        self._sprite.image = self._get_release_image(x, y)
+
+ToggleButton.register_event_type("on_toggle")
