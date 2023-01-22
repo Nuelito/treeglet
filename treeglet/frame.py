@@ -270,7 +270,14 @@ class Frame(WidgetBase):
 
 
 
+    #For TextEntries
+    def on_text(self, text):
+        for widget in self.widgets:
+            widget.on_text(text)
 
+    def on_text_motion(self, motion):
+        for widget in self.widgets:
+            widget.on_text_motion(motion)
            
 
 

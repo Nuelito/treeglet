@@ -355,3 +355,112 @@ class ToggleButton(PushButton):
         self._sprite.image = self._get_release_image(x, y)
 
 ToggleButton.register_event_type("on_toggle")
+
+
+class TextEntry(WidgetBase):
+    """
+    Derived from WidgetBase and inspired by pyglet.gui.TextEntry
+    """
+
+    def __init__(self, text, x, y, color=(0, 0, 0, 255), caret_color=(0, 0, 0), background=None, group=None, batch=None):
+
+        super().__init__(x, y, background.width, background.height)
+
+        #Litteraly copy-paste
+
+        self._doc = pyglet.text.document.UnformattedDocument(text)
+        self._doc.set_style(0, len(self._doc.text), dict(color=color))
+        font = self._doc.get_font()
+        height = font.ascent - font.descent
+
+
+        self._root = OrderedGroup(self._z, parent=group)
+        bg_group = OrderedGroup(0, parent=self._root)
+        fg_group = OrderedGroup(1, parent=self._root)
+
+        # Rectangular outline with 2-pixel pad:
+        self._outline = pyglet.sprite.Sprite(
+            background,
+            x,
+            y,
+            group=bg_group,
+            batch=batch,
+        )
+
+        # Text and Caret:
+        self._layout = pyglet.text.layout.IncrementalTextLayout(
+            self._doc, 
+            background.width, 
+            background.height, 
+            multiline=False, 
+            batch=batch, 
+            group=fg_group
+        )
+        self._layout.x = x
+        self._layout.y = y
+        self._caret = pyglet.text.caret.Caret(self._layout, color=caret_color)
+        self._layout.document.set_style(
+            0,
+            len(self._layout.document.text),
+            dict(
+                color=(125,125,125,255),
+            )
+        )
+        self._caret.color=[125,125,125]
+        self._caret.visible = False
+
+        self._focus = False
+        self._caret._set_visible(True)
+
+    def _set_focus(self, value):
+        self._focus = value
+        self._caret.visible = value
+
+    def update_groups(self, order):
+        self._outline.group = OrderedGroup(order + 1, self._user_group)
+        self._layout.group = OrderedGroup(order + 2, self._user_group)
+
+    def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
+        if not self.enabled:
+            return
+        if self._focus:
+            self._caret.on_mouse_drag(x, y, dx, dy, buttons, modifiers)
+
+    def on_mouse_press(self, x, y, buttons, modifiers):
+        if not self.enabled:
+            return
+        if self._check_hit(x, y):
+            self._set_focus(True)
+            self._caret.on_mouse_press(x, y, buttons, modifiers)
+        else:
+            self._set_focus(False)
+
+    def on_text(self, text):
+        if not self.enabled:
+            return
+        if self._focus:
+            if text in ('\r', '\n'):
+                self.dispatch_event('on_commit', self._layout.document.text)
+                self._set_focus(False)
+                return
+            self._caret.on_text(text)
+
+    def on_text_motion(self, motion):
+        if not self.enabled:
+            return
+        if self._focus:
+            self._caret.on_text_motion(motion)
+
+    def on_text_motion_select(self, motion):
+        if not self.enabled:
+            return
+        if self._focus:
+            self._caret.on_text_motion_select(motion)
+
+    def on_commit(self, text):
+        if not self.enabled:
+            return
+
+
+TextEntry.register_event_type('on_commit')
+

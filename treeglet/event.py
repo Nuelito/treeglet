@@ -18,6 +18,8 @@ class MouseHandler(pyglet.event.EventDispatcher):
         self._hwidget   = None #Hover Widget
         self._dwidget   = None #Drag widget
 
+        self._ctentry   = None
+
     """
     Custom function
     """
@@ -52,23 +54,41 @@ class MouseHandler(pyglet.event.EventDispatcher):
         self._dwidget.on_mouse_drag(bx-1, by-1, 0, 0, 0, 0)
         self._dwidget = None
 
+
+    def _set_press(self, value):
+        self._pwidget = value
+        self.ctentry = value
+
     """
     Properties
     """
+    @property
+    def ctentry(self):
+        return self._ctentry
+
+    @ctentry.setter
+    def ctentry(self, value):
+        if self._ctentry != None:
+            bx, by = self._ctentry.bottom_left
+            self._ctentry.on_mouse_press(bx-1, by, 0, 0)
+
+        self._ctentry = value
+
     @property
     def pwidget(self):
         return self._pwidget
 
     @pwidget.setter
     def pwidget(self, value):
+
         if value.parent != self._frame: return
-        if self._pwidget == None: self._pwidget = value
+        if self._pwidget == None: self._set_press(value)
         else:
             xo = self._pwidget.parent.offset_x if self._pwidget.parent else 0
             yo = self._pwidget.parent.offset_y if self._pwidget.parent else 0
 
             if self._pwidget._check_hit(self.x-xo, self.y-yo):
-                if value.z > self._pwidget.z: self._pwidget = value; return
+                if value.z > self._pwidget.z: self._set_press(value); return
                 return
             else: self._pwidget = value
 
@@ -124,6 +144,12 @@ class MouseHandler(pyglet.event.EventDispatcher):
     """
     Mouse Event
     """
+    def on_mouse_press(self, x, y, button, modifiers):
+        if self.ctentry:
+            xo = self.ctentry.parent.offset_x if self.ctentry.parent else 0 
+            yo = self.ctentry.parent.offset_y if self.ctentry.parent else 0 
+            if not self.ctentry._check_hit(x-xo, y-yo): self.ctentry = None
+
     def on_mouse_release(self, x, y, button, modifiers):
         return
 
