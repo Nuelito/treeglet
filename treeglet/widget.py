@@ -1,238 +1,88 @@
 import pyglet
-from pyglet.graphics import OrderedGroup, Batch
+from treeglet.styler import Styler
+from treeglet.helpers import Rectangle
 
-class WidgetStyler:
-    """
-    Style class to give some swagger to your widgets
-    """
-
-    target = None
-
-    #Position arguments
-    sticky_x    = True
-    sticky_y    = True
-
-    #Resolutions
-    _fixed_resolution   = False
-    _stretch_resolution = False
-
-    #Resolution arguments
-    stretch_x   = False
-    stretch_y   = False
+class EventDispatcher(pyglet.event.EventDispatcher):
+    pass
 
 
-    """
-    Position Modifiers
-    """
-    @property
-    def sticky(self):
-        return True if self.sticky_x and self.sticky_y else False
+class Widget(EventDispatcher):
 
-    @sticky.setter
-    def sticky(self, value):
-        self.sticky_x = value
-        self.sticky_y = value
+    def __init__(self, x=None, y=None, z=0, width=None, height=None, group=None, batch=None):
 
-    """
-    Resolution
-    """
-    @property
-    def aspect_ratio(self):
-        from fractions import Fraction
-        eq = Fraction(self.target.width/self.target.height).limit_denominator()
+        EventDispatcher.__init__(self)
 
-        return eq.numerator, eq.denominator
+        self._x = x
+        self._y = y
+        self._z = z
 
-    def aspect_ratio_size(self, size_x, size_y):
-        """
-        Setting up aspect ratio
-        """
+        self._width     = width
+        self._height    = height
 
-        aspect_x, aspect_y = self.aspect_ratio
-        width   = self.target.width
-        height  = self.target.height
+        self._anchor_x  = 'left'
+        self._anchor_y  = 'bottom'
 
-        if aspect_x < aspect_y:
-            width   = size_x
-            height  = size_x*aspect_y/aspect_x
-        else:
-            height  = size_y
-            width   = size_y*aspect_x/aspect_y
+        self._root   = None 
+        self._group  = group
+        self._batch  = batch
+        self._parent = None
 
-        return width, height
-
-    """
-    Size modifiers
-    """
-    @property
-    def stretch_resolution(self):
-        return self._stretch_resolution
-
-    @stretch_resolution.setter
-    def stretch_resolution(self, value):
-        self.stretch_x = value
-        self.stretch_y = value
-
-        self._stretch_resolution = value
-        self._fixed_resolution = not value if value==True else self._fixed_resolution
-
-    @property
-    def fixed_resolution(self):
-        return self._fixed_resolution
-
-    @fixed_resolution.setter
-    def fixed_resolution(self, value):
-        self._fixed_resolution = value
-        self._stretch_resolution = not value if value==True else self._stretch_resolution
-
-
-
-class WidgetBase(pyglet.gui.WidgetBase):
-    """
-    An extenstion to the `pyglet.gui.widget.WidgetBase` class to fit
-    the features of treeglet
-    """
-
-    def __init__(self, x, y, width, height, anchor_x="left", anchor_y="bottom"):
-        super().__init__(x, y, width, height)
-
-        self.mouse_handler = None
-        self._parent    = None
-        self._visible   = True
-        self._z     = 0 #Z index of widget
-        self._id    = "widget"
-
-        self.styler = WidgetStyler()
-        self.styler.target = self
-
-        #Alignement
-        self.anchor_x = anchor_x
-        self.anchor_y = anchor_y
-
-    @property
-    def bottom_left(self):
-        xO, yO = self.anchor_offset
-
-        return self._x - xO, self._y - yO
-
-    @property
-    def center(self):
-        xO, yO = self.anchor_offset
-
-        return self._x - xO+self._width//2, self._y - yO+self._height//2
-    
-    @property
-    def top_left(self):
-        xO, yO = self.anchor_offset
-
-        return self._x - xO+self._width, self._y - yO+self._height
-
-
-    @property
-    def anchor_offset(self):
-        x = 0 if self.anchor_x=='left' else self._width
-        y = 0 if self.anchor_y=='bottom' else self._height
-
-        x = self._width//2 if self.anchor_x=='center' else x
-        y = self._height//2 if self.anchor_y=='center' else y
-        return x, y
-
-    def style(self, **kwargs):
-        for var, value in kwargs.items():
-            setattr(self.styler, var, value)
-
-    @property
-    def absolute_z(self):
-        if self.parent: return self.parent.z
-        else: return self.z
-
-    """
-    Slight change
-    """
-
-    def _check_hit(self, x, y):
-        bx, by = self.bottom_left
-        return bx < x < bx + self._width and by < y < by + self._height
-        
-
-class PushButton(WidgetBase):
-
-    def __init__(self, x, y, depressed, pressed, hover, anchor_x="left", anchor_y="bottom", group=None, batch=None):
-
-        super().__init__(x, y, depressed.width, depressed.height, anchor_x=anchor_x, anchor_y=anchor_y)
-
-        self._batch = batch or Batch()
-        self._group = OrderedGroup(0, parent=group)
-        bgroup      = OrderedGroup(0, parent=self._group)
-
-        #Images
-        self._himage = hover
-        self._pimage = pressed
-        self._dimage = depressed
-
-        self._sprite = pyglet.sprite.Sprite(
-            depressed,
-            x,
-            y,
-            group=bgroup,
-            batch=self._batch
-        )
-
-        self._pressed = False
-
-    """
-    Properties
-    """
+        self.styler = Styler()
+        self._visible = True
+        self.styler._target = self
+        self._clip_rect = Rectangle()
 
     @property
     def x(self):
         return self._x
 
-    @x.setter
-    def x(self, value):
-        xO, yO  = self.anchor_offset
-        self._sprite.x = value - xO
-        self._x = value
-
-
     @property
     def y(self):
         return self._y
 
-    @y.setter
-    def y(self, value):
-        xO, yO = self.anchor_offset
-        self._sprite.y = value - yO
-        self._y = value
-
     @property
     def z(self):
+        """
+        This property defines the order in which the widget is displayed on the
+        window.
+        """
         return self._z
-
-    @z.setter
-    def z(self, value):
-        self._group = OrderedGroup(value, parent=self._group.parent)
-        bgroup = OrderedGroup(0, parent=self._group)
-        self._sprite.group = bgroup
-        self._z = value
 
     @property
     def width(self):
         return self._width
 
-    @width.setter
-    def width(self, value):
-        self._sprite.scale_x *= value/self._width
-        self._width = value
-        
     @property
     def height(self):
         return self._height
 
+    @property
+    def anchor_x(self):
+        return self._anchor_x
+
+    @property
+    def anchor_y(self):
+        return self._anchor_y
+
+    @x.setter
+    def x(self, value):
+        pass
+
+    @y.setter
+    def y(self, value):
+        pass
+
+    @z.setter
+    def z(self, value):
+        pass
+
+    @width.setter
+    def width(self, value):
+        pass
+
     @height.setter
     def height(self, value):
-        self._sprite.scale_y *= value/self._height
-        self._height = value
+        pass
 
     @property
     def visible(self):
@@ -240,227 +90,119 @@ class PushButton(WidgetBase):
 
     @visible.setter
     def visible(self, value):
-        self._visible = value
+        pass
+
+    @anchor_x.setter
+    def anchor_x(self, value):
+        c_offset = self.__anchor_x_offset__()
+        n_offset = self.__anchor_x_offset__(value)
+
+        self._anchor_x = value
+        self.x = self.x
+
+    @anchor_y.setter
+    def anchor_y(self, value):
+        c_offset = self.__anchor_y_offset__()
+        n_offset = self.__anchor_y_offset__(value)
+
+        self._anchor_y = value
+        self.y = self.y
+
+    def __anchor_x_offset__(self, value=None):
+        value = value or self.anchor_x
+        x_off = {'left' : 0, 'center': -self._width/2,'right' : -self._width}
+        return x_off[value]
+
+    def __anchor_y_offset__(self, value=None):
+        value = value or self.anchor_y
+        x_off = {'bottom' : 0, 'center': -self._height/2,'top' : -self._height}
+        return x_off[value]
 
     @property
-    def pressed(self):
-        return self._pressed
-
-    @pressed.setter
-    def pressed(self, value):
-        self._pressed = value
-
+    def left(self):
+        return self.x + self.__anchor_x_offset__()
 
     @property
-    def group(self):
-        return self._group.parent
-
-    @group.setter
-    def group(self, value):
-        self._group = OrderedGroup(self.z, parent=value)
-        bgroup = OrderedGroup(0, parent=self._group)
-        self._sprite.group = bgroup
+    def bottom(self):
+        return self.y + self.__anchor_y_offset__()
 
     @property
-    def batch(self):
-        return self._batch
+    def right(self):
+        return self.left + self.width
 
-    @batch.setter
-    def batch(self, value):
-        self._batch = value
-        self._sprite.batch = value
+    @property
+    def top(self):
+        return self.bottom + self.height
+
+    @property
+    def center(self):
+        return self.left + self.width/2, self.bottom + self.height/2
+
+    """
+    Custom functions
+    """
+
+    def set_batch(self, value):
+        pass
+
+    def set_group(self, value):
+        pass
+
+    def set_parent(self, value):
+        self._parent = value
 
     def _check_hit(self, x, y):
-        xO, yO = self.anchor_offset
-        return self._x < x+xO < self._x + self._width and self._y < y+yO < self._y + self._height
+        return self.left < x < self.right and self.bottom < y < self.top
 
-    """
-    Custom function
-    """
-    def _rel_resize(self, pp_width, pp_height):
+    def center_anchor(self):
+        self.anchor_x = 'center'
+        self.anchor_y = 'center'
+
+
+    def _resize_(self, prev_width, prev_height, curr_width, curr_height):
         """
-        Relative resize
-        Function to resize widget based on parent's changes.
-
-        Properties
-        `pp_width`  : Parent Previous Width
-        `pp_height` : Parent Previous Height
+        Core function used to resize the widget depending on the style set
+        on the styler
         """
-        new_width  = self.width*self.parent.width/pp_width
-        new_height = self.height*self.parent.height/pp_height
+        if self.width and self.width:
+            self.styler.update_size(
+                prev_width,
+                prev_height,
+                curr_width,
+                curr_height
+            )
+        if self.x and self.y:
+            self.styler.update_position(
+                prev_width,
+                prev_height,
+                curr_width,
+                curr_height,
+            )
 
-        if self.styler.stretch_resolution == True:
-            self.width  = new_width if self.styler.stretch_x else self.width
-            self.height = new_height if self.styler.stretch_y else self.height
-        elif self.styler.fixed_resolution == True:
-            self.width, self.height = self.styler.aspect_ratio_size(new_width, new_height)
-        
-    
     """
-    Window Events
+    Events
     """
 
-    def on_mouse_press(self, x, y, button, modifiers):
-        if not self.enabled or not self.visible or not self._check_hit(x,y):
-            return
-        self.pressed = True
-        self._sprite.image = self._pimage
+    def on_mouse_press(self, x, y, button, modifier):
+        pass
 
-    def on_mouse_release(self, x, y, button, modifiers):
-        if not self.enabled or not self.visible or not self.pressed:
-            return
-        self.pressed = False
-        if self._check_hit(x, y): self.dispatch_event("on_click")
-        self._sprite.image = self._himage if self._check_hit(x, y) else self._dimage
+    def on_mouse_release(self, x, y, button, modifier):
+        pass
 
     def on_mouse_motion(self, x, y, dx, dy):
-        if not self.enabled or self.pressed:
-            return
-        self._sprite.image = self._himage if self._check_hit(x, y) else self._dimage
+        pass
 
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
-        if not self.enabled or self.pressed:
-            return
-        self._sprite.image = self._himage if self._check_hit(x, y) else self._dimage
-
-PushButton.register_event_type("on_click")
-
-class ToggleButton(PushButton):
-    """
-    Extension class from pyglet.gui.ToggleButton
-    """
-
-    @property
-    def pressed(self):
-        return self._pressed
-
-    @pressed.setter
-    def pressed(self, value):
-        self._pressed = value
-        self._sprite.image = self._dimage
-
-    def _get_release_image(self, x, y):
-        return self._himage if self._check_hit(x, y) else self._dimage
-
-    def on_mouse_press(self, x, y, button, modifiers):
-        if not self.enabled or not self._check_hit(x, y):
-            return
-        self._pressed = not self._pressed
-        self._sprite.image = self._pimage if self.pressed else self._get_release_image(x, y)
-        self.dispatch_event("on_toggle", self.pressed)
-
-    def on_mouse_release(self, x, y, button, modifiers):
-        if not self.enabled or self.pressed:
-            return
-        self._sprite.image = self._get_release_image(x, y)
-
-ToggleButton.register_event_type("on_toggle")
-
-
-class TextEntry(WidgetBase):
-    """
-    Derived from WidgetBase and inspired by pyglet.gui.TextEntry
-    """
-
-    def __init__(self, text, x, y, color=(0, 0, 0, 255), caret_color=(0, 0, 0), background=None, group=None, batch=None):
-
-        super().__init__(x, y, background.width, background.height)
-
-        #Litteraly copy-paste
-
-        self._doc = pyglet.text.document.UnformattedDocument(text)
-        self._doc.set_style(0, len(self._doc.text), dict(color=color))
-        font = self._doc.get_font()
-        height = font.ascent - font.descent
-
-
-        self._root = OrderedGroup(self._z, parent=group)
-        bg_group = OrderedGroup(0, parent=self._root)
-        fg_group = OrderedGroup(1, parent=self._root)
-
-        # Rectangular outline with 2-pixel pad:
-        self._outline = pyglet.sprite.Sprite(
-            background,
-            x,
-            y,
-            group=bg_group,
-            batch=batch,
-        )
-
-        # Text and Caret:
-        self._layout = pyglet.text.layout.IncrementalTextLayout(
-            self._doc, 
-            background.width, 
-            background.height, 
-            multiline=False, 
-            batch=batch, 
-            group=fg_group
-        )
-        self._layout.x = x
-        self._layout.y = y
-        self._caret = pyglet.text.caret.Caret(self._layout, color=caret_color)
-        self._layout.document.set_style(
-            0,
-            len(self._layout.document.text),
-            dict(
-                color=(125,125,125,255),
-            )
-        )
-        self._caret.color=[125,125,125]
-        self._caret.visible = False
-
-        self._focus = False
-        self._caret._set_visible(True)
-
-    def _set_focus(self, value):
-        self._focus = value
-        self._caret.visible = value
-
-    def update_groups(self, order):
-        self._outline.group = OrderedGroup(order + 1, self._user_group)
-        self._layout.group = OrderedGroup(order + 2, self._user_group)
-
-    def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
-        if not self.enabled:
-            return
-        if self._focus:
-            self._caret.on_mouse_drag(x, y, dx, dy, buttons, modifiers)
-
-    def on_mouse_press(self, x, y, buttons, modifiers):
-        if not self.enabled:
-            return
-        if self._check_hit(x, y):
-            self._set_focus(True)
-            self._caret.on_mouse_press(x, y, buttons, modifiers)
-        else:
-            self._set_focus(False)
+        pass
+        
+    def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
+        pass
 
     def on_text(self, text):
-        if not self.enabled:
-            return
-        if self._focus:
-            if text in ('\r', '\n'):
-                self.dispatch_event('on_commit', self._layout.document.text)
-                self._set_focus(False)
-                return
-            self._caret.on_text(text)
+        return
 
     def on_text_motion(self, motion):
-        if not self.enabled:
-            return
-        if self._focus:
-            self._caret.on_text_motion(motion)
+        pass
 
     def on_text_motion_select(self, motion):
-        if not self.enabled:
-            return
-        if self._focus:
-            self._caret.on_text_motion_select(motion)
-
-    def on_commit(self, text):
-        if not self.enabled:
-            return
-
-
-TextEntry.register_event_type('on_commit')
-
+        pass
