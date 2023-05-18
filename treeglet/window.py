@@ -11,6 +11,7 @@ class Window(pyglet.window.Window):
 
         self._prev_res = self.width, self.height
         self._children = set()
+        self.can_clear = True
 
         self._bgcolor = 0.7, 0.7, 0.7, 1.0
         self._group = pyglet.graphics.Group()
