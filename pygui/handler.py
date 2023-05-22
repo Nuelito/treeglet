@@ -33,6 +33,9 @@ class EventHandler:
         self.x = x
         self.y = y
 
+    def rel_pos(self, con):
+        return self.x - con.translate_x, self.y - con.translate_y
+
     """
     Mouse Events
     """
@@ -47,7 +50,7 @@ class EventHandler:
             pwidget.on_mouse_press(pwidget.left-1,y,button,modifiers)
 
         if cwidget:
-            if self.con_hit(ccontainer): cwidget.on_mouse_press(x, y, button, modifiers)
+            if self.con_hit(ccontainer): cwidget.on_mouse_press(*self.rel_pos(cwidget.parent), button, modifiers)
             else: cwidget.on_mouse_press(cwidget.left-1,y,button,modifiers)
         self.twidgets['pressed'] = cwidget
         self.ccontainer = ccontainer
@@ -57,7 +60,7 @@ class EventHandler:
         pwidget = self.twidgets['pressed']
         if not pwidget: return
 
-        if self.con_hit(pwidget.parent): pwidget.on_mouse_release(x, y, button, modifiers)
+        if self.con_hit(pwidget.parent): pwidget.on_mouse_release(*self.rel_pos(pwidget.parent), button, modifiers)
         else: pwidget.on_mouse_release(pwidget.left-1, y, button, modifiers)
 
     def on_mouse_motion(self, x, y, dx, dy):
@@ -71,17 +74,18 @@ class EventHandler:
             mwidget.on_mouse_motion(mwidget.left-1,y, dx, dy)
 
         if cwidget:
-            if self.con_hit(ccontainer): cwidget.on_mouse_motion(x, y, dx, dy)
+            if self.con_hit(ccontainer): cwidget.on_mouse_motion(*self.rel_pos(cwidget.parent), dx, dy)
             else: cwidget.on_mouse_motion(cwidget.left-1, y, dx, dy)
         self.twidgets['motion'] = cwidget
         self.ccontainer = ccontainer
         
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
         self._update_position(x, y)
-        if self.twidgets['pressed']: self.twidgets['pressed'].on_mouse_drag(x, y, dx, dy, button, modifiers)
+        if self.twidgets['pressed']: self.twidgets['pressed'].on_mouse_drag(*self.rel_pos(self.twidgets['pressed'].parent), dx, dy, button, modifiers)
 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
-        pass
+        ccontainer = self.top_container()
+        if ccontainer and self.con_hit(ccontainer): ccontainer.scroll(scroll_x, scroll_y)
 
     """
     Text Events

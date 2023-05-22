@@ -21,31 +21,46 @@ class Frame(Widget):
         super(Frame, self).__init__(x, y, z, width, height, anchor_x, anchor_y)
 
 
+        self._background = None
         self.children = set()
         self.children_by_id = dict()
 
         self._handler = None
+        self.scrollable = True
+        self.scroll_speed = [1.0, 1.0]
 
         self.window = window
         self._group = Group(z, parent=None)
         self.fgroup = ScissorGroup(window, Rectangle(x, y, width, height), order=self.z, parent=self._group)
+
+    @property
+    def background(self):
+        return self._background
+
+    @background.setter
+    def background(self, value):
+        self._background = value
+        bgroup = Group(0, parent=self._group)
+        self._background.set_group(bgroup)
+        self._background.width = self.width
+        self._background.height = self.height
+        self._background.set_batch(self.batch)
     
     def _update_position(self):
         self.fgroup.area.x = self.x + self.__anchor_x_offset__()
         self.fgroup.area.y = self.y + self.__anchor_y_offset__()
+        
+        if not self.background: return
+        self.background.x = self.fgroup.area.x
+        self.background.y = self.fgroup.area.y
 
+    def _update_size(self):
+        self._background.width = self.width
+        self._background.height = self.height
 
-    def set_group(self, value):
-        self._group = Group(self.z, parent=value)
-        self.fgroup = ScissorGroup(self.window, 
-                                   Rectangle(self.left, self.bottom, self.width, self.height),
-                                   self.fgroup.translate_x,
-                                   self.fgroup.translate_y,
-                                   order=self.z, 
-                                   parent=self.group)
-        self._group.visible = self._visible
-
-        [child.set_group(self.fgroup) for child in self.children]
+    def scroll(self, scroll_x, scroll_y):
+        self.translate_x += scroll_x * self.scroll_speed[0]
+        self.translate_y += scroll_y * self.scroll_speed[1]
 
     @property
     def translate_x(self):
@@ -61,7 +76,7 @@ class Frame(Widget):
 
     @translate_y.setter
     def translate_y(self, value):
-        self.fgroup.transalte_y = value
+        self.fgroup.translate_y = value
 
     @property
     def handler(self):
@@ -72,7 +87,25 @@ class Frame(Widget):
         self._handler = value
         value.add_container(self)
 
+    def set_group(self, value):
+        self._group = Group(self.z, parent=value)
+        self.fgroup = ScissorGroup(self.window, 
+                                   Rectangle(self.left, self.bottom, self.width, self.height),
+                                   self.fgroup.translate_x,
+                                   self.fgroup.translate_y,
+                                   order=1, 
+                                   parent=self.group)
+        self._group.visible = self._visible
+
+        if self.background:
+            bgroup = Group(0, parent=self._group)
+            self.background.set_group(bgroup)
+
+        [child.set_group(self.fgroup) for child in self.children]
+
+
     def set_batch(self, value):
+        if self.background: self.background.set_batch(value)
         [child.set_batch(value) for child in self.children]
         self._batch = value
 

@@ -10,8 +10,8 @@ class ScissorGroup(Group):
         self.area = area
         self.window = window
 
-        self.translate_x = 0
-        self.translate_y = 0
+        self.translate_x = translate_x
+        self.translate_y = translate_y
 
     def set_state(self):
         glEnable(GL_SCISSOR_TEST)
