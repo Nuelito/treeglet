@@ -55,6 +55,7 @@ class Frame(Widget):
         self.background.y = self.fgroup.area.y
 
     def _update_size(self):
+        if not self.background: return
         self._background.width = self.width
         self._background.height = self.height
 
